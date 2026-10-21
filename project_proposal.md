@@ -1,10 +1,9 @@
 # Parking Availability Prediction — MLOps Project Proposal
 
 **Dataset:** UCI Machine Learning Repository — Parking Birmingham  
-**Proposal due:** October 21, 2026  
 **Internal completion target:** November 30, 2026  
 **Official project deadline:** December 2, 2026  
-**Team members / owners:** TBD  
+**Team members / owners:** Emmalucia E, Alison C, Monica P
 **Project status:** Proposed
 
 ## 1. Project Context and Motivation
