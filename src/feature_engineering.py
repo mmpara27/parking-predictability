@@ -50,6 +50,12 @@ def create_historical_features(df: pd.DataFrame) -> pd.DataFrame:
         data["Occupancy"] - data["occupancy_lag_1"]
     )
 
+    # Rolling mean using current and two previous observations
+    data["occupancy_rolling_mean_3"] = (
+        data.groupby("SystemCodeNumber")["Occupancy"]
+        .transform(lambda x: x.rolling(window=3, min_periods=3).mean())
+    )
+
     # Historical time intervals
     data["lag_interval_1"] = (
         groups["LastUpdated"].diff().dt.total_seconds() / 60
@@ -70,6 +76,7 @@ def create_historical_features(df: pd.DataFrame) -> pd.DataFrame:
         "occupancy_lag_1",
         "occupancy_lag_2",
         "occupancy_change_1",
+        "occupancy_rolling_mean_3",
     ]
 
     data.loc[~valid_lags, lag_columns] = float("nan")
