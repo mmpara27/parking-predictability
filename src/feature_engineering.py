@@ -34,7 +34,7 @@ def create_historical_features(df: pd.DataFrame) -> pd.DataFrame:
 
     # Calendar features
     data["hour"] = data["LastUpdated"].dt.hour
-    data["day_of_week"] = data["LastUpdated"].dt.dayofweek
+    data["day_of_week"] = data["LastUpdated"].dt.day_of_week
     data["is_weekend"] = (
         data["day_of_week"] >= 5
     ).astype(int)

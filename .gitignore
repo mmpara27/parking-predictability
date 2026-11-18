@@ -3,3 +3,14 @@ __pycache__/
 .ipynb_checkpoints/
 .venv/
 artifacts/*.joblib
+
+# Airflow local environment
+airflow_home/
+.airflow/
+
+# Generated pipeline outputs
+artifacts/baseline/
+artifacts/pipeline_runs/
+
+# macOS
+.DS_Store
