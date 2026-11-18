@@ -53,7 +53,7 @@ parking-predictability/
 │   └── dataset.csv
 ├── notebooks/
 │   ├── 01_data_audit.ipynb
-│   └── 02_feature_engineering.ipynb
+│   ├── 02_feature_engineering.ipynb
 ├── src/
 │   ├── data_validation.py
 │   ├── feature_engineering.py
@@ -151,7 +151,7 @@ As of November 17, 2026:
 | Data audit and validation | Completed |
 | Feature engineering and chronological splits | Implemented and tested |
 | Reusable feature schema | Implemented and tested |
-| Baseline and regression models | Pending |
+| Baseline and regression models | Implemented and tested |
 | Airflow pipeline | Pending |
 | MLflow tracking and registration | Pending |
 | FastAPI and Docker deployment | Pending |
@@ -165,6 +165,29 @@ To explore the completed work, open the following notebooks in VS Code or Jupyte
 
 1. `notebooks/01_data_audit.ipynb`
 2. `notebooks/02_feature_engineering.ipynb`
+3. `notebooks/03_modeling.ipynb`
+
+### Reproducible Model Training
+
+Install the project dependencies:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+Run the baseline and regression training workflow from the repository root:
+
+```bash
+python -m src.train_models
+```
+
+This uses the chronological training and validation splits, leaves the test split untouched, and writes:
+
+- `artifacts/linear_regression.joblib`
+- `artifacts/random_forest.joblib`
+- `artifacts/validation_metrics.json`
+
+Custom input or artifact paths can be provided with `--data` and `--artifacts`.
 
 Reusable Python functions are available in the `src/` directory.
 
@@ -175,6 +198,26 @@ Full environment setup and end-to-end execution instructions will be added as th
 - [Project Proposal](project_proposal.md) — Original objectives, architecture, timeline, and deliverables
 - `notebooks/01_data_audit.ipynb` — Dataset exploration and validation
 - `notebooks/02_feature_engineering.ipynb` — Forecast target construction, historical features, and chronological splitting
+
+## Modeling Validation Results
+
+Using chronological validation data:
+
+| Model | MAE | RMSE |
+|---|---:|---:|
+| Random Forest | 18.775141 | 33.672739 |
+| Linear Regression | 20.013103 | 33.674048 |
+| Persistence Baseline | 54.100620 | 93.675742 |
+
+Random Forest was the lowest-RMSE model on validation data. The held-out test split was not used during model selection.
+
+## Running Tests
+
+Run the unit tests from the repository root:
+
+```bash
+python -m unittest discover -s tests -v
+```
 
 ## Project Team
 
