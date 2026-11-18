@@ -15,6 +15,10 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 
+import mlflow
+import mlflow.sklearn
+
+
 from src.data_validation import validate_parking_data
 from src.feature_engineering import (
     chronological_split,
@@ -85,6 +89,11 @@ def train_from_splits(
     artifact_dir: Path,
 ) -> dict:
     """Train and evaluate models using prepared data splits."""
+   
+    mlflow.set_tracking_uri("http://127.0.0.1:5000")
+    mlflow.set_experiment("parking-occupancy-prediction")
+
+    
     required_columns = FEATURE_COLUMNS + [TARGET_COLUMN]
     train_model_df = train_df.dropna(subset=required_columns).copy()
     validation_model_df = validation_df.dropna(subset=required_columns).copy()
@@ -139,6 +148,67 @@ def train_from_splits(
         "Linear Regression": evaluate(y_validation, linear_predictions),
         "Random Forest": evaluate(y_validation, random_forest_predictions),
     }
+
+    # Track the persistence baseline in MLflow
+    with mlflow.start_run(run_name="Persistence Baseline"):
+        mlflow.log_param("model_type", "persistence")
+        mlflow.log_param("forecast_horizon_minutes", 30)
+        mlflow.log_param("feature_count", len(FEATURE_COLUMNS))
+
+        mlflow.log_metric("validation_mae", metrics["Persistence Baseline"]["MAE"])
+        mlflow.log_metric("validation_rmse", metrics["Persistence Baseline"]["RMSE"])
+
+    # Track Linear Regression in MLflow
+    with mlflow.start_run(run_name="Linear Regression"):
+        mlflow.log_param("model_type", "linear_regression")
+        mlflow.log_param("forecast_horizon_minutes", 30)
+        mlflow.log_param("feature_count", len(FEATURE_COLUMNS))
+
+        mlflow.log_metric(
+            "validation_mae",
+            metrics["Linear Regression"]["MAE"]
+        )
+        mlflow.log_metric(
+            "validation_rmse",
+            metrics["Linear Regression"]["RMSE"]
+        )
+
+        mlflow.sklearn.log_model(
+            sk_model=linear_model,
+            name="linear_regression",
+            skops_trusted_types=["numpy.dtype"]
+        )
+
+    # Track Random Forest in MLflow
+    with mlflow.start_run(run_name="Random Forest"):
+        mlflow.log_param("model_type", "random_forest")
+        mlflow.log_param("forecast_horizon_minutes", 30)
+        mlflow.log_param("feature_count", len(FEATURE_COLUMNS))
+
+        mlflow.log_params({
+            "n_estimators": 200,
+            "random_state": 42,
+            "min_samples_leaf": 2,
+            "n_jobs": -1,
+        })
+
+        mlflow.log_metric(
+            "validation_mae",
+            metrics["Random Forest"]["MAE"]
+        )
+        mlflow.log_metric(
+            "validation_rmse",
+            metrics["Random Forest"]["RMSE"]
+        )
+
+        mlflow.sklearn.log_model(
+            sk_model=random_forest_model,
+            name="random_forest",
+            skops_trusted_types=[
+                "numpy.dtype",
+                "sklearn.tree._tree.Tree"
+            ]
+        )
 
     artifact_dir.mkdir(parents=True, exist_ok=True)
     joblib.dump(linear_model, artifact_dir / "linear_regression.joblib")

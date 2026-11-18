@@ -14,3 +14,9 @@ artifacts/pipeline_runs/
 
 # macOS
 .DS_Store
+
+# Local MLflow tracking files
+mlflow.db
+mlruns/
+mlartifacts/
+
