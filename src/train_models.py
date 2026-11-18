@@ -62,15 +62,38 @@ def evaluate(y_true: pd.Series, predictions: np.ndarray) -> dict:
 
 
 def train(data_path: Path, artifact_dir: Path) -> dict:
+    """Run the complete training workflow from a CSV file."""
     raw_df = pd.read_csv(data_path)
     validated_df = validate_parking_data(raw_df)
     historical_df = create_historical_features(validated_df)
     forecast_df = create_forecast_targets(historical_df)
     train_df, validation_df, test_df = chronological_split(forecast_df)
 
+    print("Original observations:", len(raw_df))
+    print("Validated observations:", len(validated_df))
+    print("Valid forecasting examples:", len(forecast_df))
+    print("Held-out test examples:", len(test_df))
+
+    return train_from_splits(
+        train_df, validation_df, artifact_dir
+    )
+
+
+def train_from_splits(
+    train_df: pd.DataFrame,
+    validation_df: pd.DataFrame,
+    artifact_dir: Path,
+) -> dict:
+    """Train and evaluate models using prepared data splits."""
     required_columns = FEATURE_COLUMNS + [TARGET_COLUMN]
     train_model_df = train_df.dropna(subset=required_columns).copy()
     validation_model_df = validation_df.dropna(subset=required_columns).copy()
+
+    if train_model_df.empty:
+        raise ValueError("No valid training examples remain.")
+
+    if validation_model_df.empty:
+        raise ValueError("No valid validation examples remain.")
 
     X_train = train_model_df[FEATURE_COLUMNS]
     y_train = train_model_df[TARGET_COLUMN]
@@ -124,12 +147,8 @@ def train(data_path: Path, artifact_dir: Path) -> dict:
     with (artifact_dir / "validation_metrics.json").open("w") as file:
         json.dump(metrics, file, indent=2)
 
-    print("Original observations:", len(raw_df))
-    print("Validated observations:", len(validated_df))
-    print("Valid forecasting examples:", len(forecast_df))
     print("Training examples:", len(train_model_df))
     print("Validation examples:", len(validation_model_df))
-    print("Held-out test examples:", len(test_df))
     print("\nValidation metrics:")
     print(pd.DataFrame(metrics).T.sort_values("RMSE").to_string())
 

@@ -34,7 +34,8 @@ The dataset contains historical occupancy observations from 30 parking facilitie
 | Original observations | 35,717 |
 | Parking facilities | 30 |
 | Validated observations | 35,116 |
-| Forecasting examples with complete historical features | 25,793 |
+| Forecasting examples before split exclusions | 31,327 |
+| Complete-feature examples (exploratory notebook) | 25,793 |
 | Forecast horizon | Approximately 30 minutes |
 | Model input features | 11 |
 
@@ -49,20 +50,36 @@ Original columns:
 
 ```text
 parking-predictability/
+├── artifacts/
+│   ├── validation_metrics.json
+│   └── pipeline_runs/              # Generated locally
+├── dags/
+│   └── parking_training_dag.py
 ├── data/
 │   └── dataset.csv
 ├── notebooks/
 │   ├── 01_data_audit.ipynb
 │   ├── 02_feature_engineering.ipynb
+│   └── 03_modeling.ipynb
+├── scripts/
+│   └── airflow_env.sh
 ├── src/
 │   ├── data_validation.py
 │   ├── feature_engineering.py
-│   └── feature_schema.py
+│   ├── feature_schema.py
+│   ├── pipeline_tasks.py
+│   └── train_models.py
+├── tests/
+│   ├── test_pipeline_tasks.py
+│   ├── test_train_models.py
+│   └── test_training_dag.py
+├── requirements.txt
+├── requirements-airflow.txt
 ├── project_proposal.md
 └── README.md
 ```
 
-Additional files and directories will be added as model training, automation, deployment, and monitoring are implemented.
+Generated model artifacts, pipeline run directories, virtual environments, and local Airflow databases are excluded from version control. Additional deployment, experiment tracking, and monitoring components will be added as development progresses.
 
 ## Data Validation
 
@@ -109,37 +126,40 @@ Reusable feature engineering functions are implemented in `src/feature_engineeri
 
 ## Chronological Data Splitting
 
-To reduce temporal leakage, observations are divided chronologically rather than randomly.
+To reduce temporal leakage, observations are divided chronologically rather than randomly. Forecast targets crossing split boundaries are excluded.
 
-| Dataset | Observations |
-|---|---:|
-| Training | 18,423 |
-| Validation | 3,509 |
-| Test | 3,833 |
+The automated training pipeline produces the following splits:
 
-Forecast targets crossing split boundaries are excluded.
+| Dataset | Before complete-feature filtering | Used for model development |
+|---|---:|---:|
+| Training | 22,467 | 18,627 |
+| Validation | 4,143 | 3,389 |
+| Test | 4,666 | Reserved for final evaluation |
 
-The test dataset is reserved for final evaluation and is not used during model development.
+Training and validation records with incomplete historical features are excluded before model fitting and evaluation. The held-out test split remains untouched.
+
+The earlier exploratory notebook used a different filtering and splitting workflow. The counts above reflect the current reproducible training pipeline.
 
 **Verification completed:**
 
 - All 11 input features are available.
-- Training and validation features contain no missing values.
+- Training and validation features contain no missing values after filtering.
 - Target columns are excluded from model inputs.
-- Feature leakage checks pass.
+- Forecast targets crossing chronological split boundaries are excluded.
+- Temporal leakage checks pass.
 
-## Planned MLOps Pipeline
+## MLOps Pipeline
 
-The following components are planned for subsequent development.
+The project combines reusable machine learning functions with orchestration, experiment tracking, deployment, and monitoring components.
 
-| Component | Technology | Purpose |
-|---|---|---|
-| Pipeline orchestration | Apache Airflow | Automate data preparation and model training |
-| Model training | scikit-learn | Compare baseline and regression models |
-| Experiment tracking | MLflow | Record model parameters, metrics, and artifacts |
-| Model serving | FastAPI | Expose a prediction endpoint |
-| Containerization | Docker | Package the inference application |
-| Model monitoring | Evidently AI | Detect data drift and monitor input distributions |
+| Component | Technology | Purpose | Status |
+|---|---|---|---|
+| Pipeline orchestration | Apache Airflow | Automate data preparation and model training | Implemented |
+| Model training | scikit-learn | Compare baseline and regression models | Implemented |
+| Experiment tracking | MLflow | Record model parameters, metrics, and artifacts | Planned |
+| Model serving | FastAPI | Expose a prediction endpoint | Planned |
+| Containerization | Docker | Package the inference application | Planned |
+| Model monitoring | Evidently AI | Detect data drift and monitor input distributions | Planned |
 
 ## Project Progress
 
@@ -152,7 +172,7 @@ As of November 17, 2026:
 | Feature engineering and chronological splits | Implemented and tested |
 | Reusable feature schema | Implemented and tested |
 | Baseline and regression models | Implemented and tested |
-| Airflow pipeline | Pending |
+| Airflow pipeline | Implemented and tested |
 | MLflow tracking and registration | Pending |
 | FastAPI and Docker deployment | Pending |
 | Monitoring and drift simulation | Pending |
@@ -191,13 +211,228 @@ Custom input or artifact paths can be provided with `--data` and `--artifacts`.
 
 Reusable Python functions are available in the `src/` directory.
 
-Full environment setup and end-to-end execution instructions will be added as the automated pipeline is implemented.
+## Automated Training Pipeline with Apache Airflow
+
+The `parking_training` DAG orchestrates the complete model training workflow using Apache Airflow 2.11.0 and the project's shared Python functions.
+
+### Pipeline Architecture
+
+```mermaid
+flowchart TD
+    A[Data Ingestion] --> B[Data Validation]
+    B --> C[Preprocessing and Feature Engineering]
+    C --> D[Model Training and Validation]
+    D --> E[Artifact Verification]
+```
+
+### Pipeline Tasks
+
+| Task | Responsibility |
+|---|---|
+| `ingest_data` | Load the input CSV, check file availability, and reject empty datasets. |
+| `validate_data` | Apply shared data validation rules and reject invalid input schemas. |
+| `preprocess_data` | Construct historical features and forecasting targets, then create chronological training, validation, and test splits. |
+| `train_models` | Train regression models, evaluate validation performance, and save model artifacts. |
+| `verify_artifacts` | Verify that required model files and valid evaluation metrics were generated. |
+
+Pipeline functions are implemented in `src/pipeline_tasks.py`, while orchestration and task dependencies are defined in `dags/parking_training_dag.py`.
+
+The DAG passes intermediate file paths between tasks using Airflow XCom rather than transferring entire datasets through the metadata database.
+
+### DAG Configuration
+
+| Setting | Value |
+|---|---|
+| DAG ID | `parking_training` |
+| Schedule | Manual execution |
+| Catchup | Disabled |
+| Maximum active runs | 1 |
+| Task retries | 1 |
+| Retry delay | 1 minute |
+| Default dataset | `data/dataset.csv` |
+
+Manual execution is appropriate for the current historical dataset. Scheduled training can be introduced when recurring data ingestion is available.
+
+### Environment Setup
+
+Python 3.11 is recommended for the tested Airflow environment.
+
+From the repository root, create and activate a virtual environment:
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+```
+
+Install Airflow using the official version-specific constraints:
+
+```bash
+AIRFLOW_VERSION=2.11.0
+PYTHON_VERSION=3.11
+
+CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
+
+python -m pip install -r requirements-airflow.txt \
+  --constraint "${CONSTRAINT_URL}"
+```
+
+Install the remaining project dependencies:
+
+```bash
+python -m pip install -r requirements.txt
+python -m pip check
+```
+
+Configure the local Airflow environment and initialize its metadata database:
+
+```bash
+source scripts/airflow_env.sh
+airflow db migrate
+```
+
+The environment script configures the project-specific Airflow home directory, DAG directory, and Python import path. Run it from the repository root in each new terminal session.
+
+Verify the DAG installation:
+
+```bash
+airflow version
+airflow dags list
+airflow dags list-import-errors
+```
+
+### Local Development Limitations
+
+CLI-based DAG execution and automated tests were verified on Apple Silicon using macOS and Python 3.11.
+
+A native macOS process-forking issue involving `setproctitle` caused worker crashes when starting the standalone Airflow services. A similar issue is documented in [Apache Airflow Issue #55838](https://github.com/apache/airflow/issues/55838).
+
+This affected standalone Airflow startup but did not prevent successful CLI-based DAG execution or automated testing.
+
+For local development, use `airflow dags test parking_training`. Containerized Airflow execution can be evaluated during the Docker integration phase.
+
+### Tested Environment
+
+The automated training pipeline was developed and verified using Python 3.11.18 on Apple Silicon (macOS ARM64).
+
+| Dependency | Tested version |
+|---|---|
+| Apache Airflow | 2.11.0 |
+| pandas | 3.1.1 |
+| NumPy | 2.4.6 |
+| scikit-learn | 1.9.1 |
+| joblib | 1.6.0 |
+| Pendulum | 3.1.0 |
+
+Airflow is installed separately from the shared machine learning dependencies to avoid requiring orchestration packages for standalone model training and inference development.
+
+The versions above document the verified development environment. The shared `requirements.txt` retains minimum dependency versions to support ongoing team development.
+
+### Running the Pipeline
+
+Execute the complete DAG locally without starting the scheduler or webserver:
+
+```bash
+airflow dags test parking_training
+```
+
+To provide a different input dataset:
+
+```bash
+airflow dags test parking_training \
+  --conf '{"data_path":"data/dataset.csv"}'
+```
+
+The input path can be absolute or relative to the repository root.
+
+### Generated Artifacts
+
+Each DAG run creates an isolated output directory identified by a hash of its Airflow run ID.
+
+```text
+artifacts/pipeline_runs/<run_hash>/
+├── raw_data.pkl
+├── validated_data.pkl
+├── train.pkl
+├── validation.pkl
+├── test.pkl
+├── preprocessing_summary.json
+└── models/
+    ├── linear_regression.joblib
+    ├── random_forest.joblib
+    └── validation_metrics.json
+```
+
+Intermediate datasets, trained models, and evaluation results are preserved separately for each run.
+
+The pipeline currently uses local file-based storage. Intermediate pickle files and model artifacts should only be loaded from trusted sources. Generated pipeline directories are excluded from Git.
+
+### Pipeline Verification
+
+The complete pipeline was tested using the original historical parking dataset.
+
+| Metric | Result |
+|---|---:|
+| Raw observations | 35,717 |
+| Validated observations | 35,116 |
+| Forecasting examples before chronological boundary exclusions | 31,327 |
+| Training observations used | 18,627 |
+| Validation observations used | 3,389 |
+| Held-out test observations | 4,666 |
+| Successful DAG execution time | Approximately 20–22 seconds |
+
+The automated workflow reproduces the validation metrics from the standalone training implementation.
+
+### Failure Handling
+
+The DAG was tested under two intentional failure scenarios.
+
+| Task | Missing dataset | Invalid schema |
+|---|---|---|
+| Data ingestion | Failed | Success |
+| Data validation | Upstream failed | Failed |
+| Preprocessing | Upstream failed | Upstream failed |
+| Model training | Upstream failed | Upstream failed |
+| Artifact verification | Upstream failed | Upstream failed |
+
+To reproduce the missing-file scenario:
+
+```bash
+airflow dags test parking_training \
+  --conf '{"data_path":"data/nonexistent.csv"}'
+```
+
+To reproduce the invalid-schema scenario:
+
+```bash
+mkdir -p artifacts/pipeline_runs/failure_inputs
+
+printf 'Occupancy\n10\n20\n' \
+  > artifacts/pipeline_runs/failure_inputs/invalid_schema.csv
+
+airflow dags test parking_training \
+  --conf '{"data_path":"artifacts/pipeline_runs/failure_inputs/invalid_schema.csv"}'
+```
+
+Both runs are expected to fail. Invalid input prevents downstream processing and model training. A subsequent execution using valid data completed successfully, demonstrating pipeline recovery.
+
+### Local Development Limitations
+
+CLI-based DAG execution and automated tests were verified on Apple Silicon using macOS and Python 3.11.
+
+A native macOS process-forking issue involving `setproctitle` caused worker crashes when starting the standalone Airflow services. This affects the local scheduler and webserver environment rather than the verified CLI training workflow.
+
+For local development, use `airflow dags test parking_training`. Containerized Airflow execution can be evaluated during the Docker integration phase.
 
 ## Project Documentation
 
 - [Project Proposal](project_proposal.md) — Original objectives, architecture, timeline, and deliverables
 - `notebooks/01_data_audit.ipynb` — Dataset exploration and validation
 - `notebooks/02_feature_engineering.ipynb` — Forecast target construction, historical features, and chronological splitting
+- `notebooks/03_modeling.ipynb` — Baseline and regression model development
+- `src/train_models.py` — Reproducible model training and validation
+- `src/pipeline_tasks.py` — Reusable automated training pipeline tasks
+- `dags/parking_training_dag.py` — Airflow orchestration and task dependencies
+- `tests/` — Automated project, pipeline, and DAG verification
 
 ## Modeling Validation Results
 
@@ -213,11 +448,45 @@ Random Forest was the lowest-RMSE model on validation data. The held-out test sp
 
 ## Running Tests
 
-Run the unit tests from the repository root:
+Install the project and Airflow dependencies using the environment setup instructions above.
+
+From the repository root, activate the virtual environment and load the Airflow configuration:
+
+```bash
+source .venv/bin/activate
+source scripts/airflow_env.sh
+```
+
+Run the complete automated test suite:
 
 ```bash
 python -m unittest discover -s tests -v
 ```
+
+Run pipeline-specific tests:
+
+```bash
+python -m unittest discover -s tests -p "test_pipeline_tasks.py" -v
+```
+
+Run DAG configuration and dependency tests:
+
+```bash
+python -m unittest discover -s tests -p "test_training_dag.py" -v
+```
+
+### Test Coverage
+
+| Test category | Tests passed |
+|---|---:|
+| Existing project tests | 4 |
+| Pipeline task tests | 11 |
+| Airflow DAG tests | 6 |
+| Total | 21 |
+
+The tests cover input ingestion, invalid input handling, chronological splitting, model training, artifact verification, DAG loading, task dependencies, and execution configuration.
+
+All 21 automated tests passed. End-to-end Airflow execution was also verified separately through successful runs and intentional failure scenarios.
 
 ## Project Team
 
