@@ -488,6 +488,96 @@ The tests cover input ingestion, invalid input handling, chronological splitting
 
 All 21 automated tests passed. End-to-end Airflow execution was also verified separately through successful runs and intentional failure scenarios.
 
+
+## Prediction API
+
+The FastAPI service predicts parking facility occupancy approximately 30 minutes ahead using a registered MLflow model.
+
+### Installation
+
+From the repository root:
+
+```bash
+pip install -r requirements-api.txt
+```
+
+### Configuration
+
+The API uses the following environment variables:
+
+| Variable | Default | Description |
+|---|---|---|
+| `MLFLOW_TRACKING_URI` | `http://127.0.0.1:5001` | MLflow tracking and model registry location |
+| `MODEL_URI` | `models:/parking-occupancy-random-forest/1` | Registered model to load for inference |
+
+The specified model must be registered and accessible before making predictions.
+
+### Start the API
+
+```bash
+uvicorn src.api:app --reload
+```
+
+Interactive API documentation is available at:
+
+- http://127.0.0.1:8000/docs
+
+### Endpoints
+
+**GET `/health`**
+
+Returns the API status and configured model URI.
+
+**POST `/predict`**
+
+Accepts parking facility information and historical occupancy features.
+
+Example request:
+
+```json
+{
+  "SystemCodeNumber": "BHMBCCMKT01",
+  "Capacity": 100,
+  "Occupancy": 70,
+  "hour": 14,
+  "day_of_week": 2,
+  "is_weekend": 0,
+  "month": 11,
+  "occupancy_lag_1": 68,
+  "occupancy_lag_2": 65,
+  "occupancy_change_1": 2,
+  "occupancy_rolling_mean_3": 67.67
+}
+```
+
+Example response (illustrative):
+
+```json
+{
+  "facility": "BHMBCCMKT01",
+  "forecast_horizon_minutes": 30,
+  "predicted_occupancy": 75.5,
+  "predicted_available_spaces": 24.5,
+  "capacity": 100,
+  "model_uri": "models:/parking-occupancy-random-forest/1",
+  "model_version": "1"
+}
+```
+
+Predicted occupancy is constrained between zero and facility capacity. Available spaces are calculated by subtracting predicted occupancy from capacity.
+
+Invalid requests return HTTP 422.
+
+### Testing
+
+Run the API unit tests without requiring a registered MLflow model:
+
+```bash
+python -m pytest tests/test_api.py -v
+```
+
+The tests use a mock model to verify request validation, prediction outputs, feature ordering, and clipping behavior.
+
 ## Project Team
 
 - Emmalucia E.
