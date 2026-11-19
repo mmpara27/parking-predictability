@@ -5,8 +5,9 @@ import os
 import pandas as pd
 import mlflow
 import mlflow.sklearn
-from fastapi import FastAPI
-from pydantic import BaseModel, Field
+from functools import lru_cache
+from fastapi import FastAPI, Depends
+from pydantic import BaseModel, Field, model_validator
 
 from src.feature_schema import FEATURE_COLUMNS
 
@@ -22,14 +23,15 @@ MODEL_URI = os.getenv(
 
 MLFLOW_TRACKING_URI = os.getenv(
     "MLFLOW_TRACKING_URI",
-    "http://127.0.0.1:5000",
+    "http://127.0.0.1:5001",
 )
 
 mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 
-# Load the registered model once when the application starts.
-model = mlflow.sklearn.load_model(MODEL_URI)
-
+@lru_cache(maxsize=1)
+def get_model():
+    """Load and cache the registered MLflow model."""
+    return mlflow.sklearn.load_model(MODEL_URI)
 
 @app.get("/health")
 def health():
@@ -51,9 +53,41 @@ class ParkingPredictionRequest(BaseModel):
     occupancy_change_1: float
     occupancy_rolling_mean_3: float = Field(ge=0)
 
+    @model_validator(mode="after")
+    def validate_capacity(self):
+        """Ensure observed occupancy values do not exceed capacity."""
+        occupancy_fields = [
+            "Occupancy",
+            "occupancy_lag_1",
+            "occupancy_lag_2",
+            "occupancy_rolling_mean_3",
+        ]
 
-@app.post("/predict")
-def predict(request: ParkingPredictionRequest):
+        for field in occupancy_fields:
+            if getattr(self, field) > self.Capacity:
+                raise ValueError(
+                    f"{field} cannot exceed facility capacity"
+                )
+
+        return self
+
+class ParkingPredictionResponse(BaseModel):
+    facility: str
+    forecast_horizon_minutes: int
+    predicted_occupancy: float = Field(ge=0)
+    predicted_available_spaces: float = Field(ge=0)
+    capacity: int = Field(gt=0)
+    model_uri: str
+    model_version: str
+
+@app.post(
+    "/predict",
+    response_model=ParkingPredictionResponse,
+)
+def predict(
+    request: ParkingPredictionRequest,
+    model=Depends(get_model),
+):
     # Convert the validated request to the training feature schema
     input_data = pd.DataFrame(
         [request.model_dump()]
@@ -79,4 +113,5 @@ def predict(request: ParkingPredictionRequest):
         ),
         "capacity": request.Capacity,
         "model_uri": MODEL_URI,
+        "model_version": MODEL_URI.rsplit("/", 1)[-1],
     }
