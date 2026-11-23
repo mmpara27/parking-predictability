@@ -578,6 +578,20 @@ python -m pytest tests/test_api.py -v
 
 The tests use a mock model to verify request validation, prediction outputs, feature ordering, and clipping behavior.
 
+### Clean held-out API validation
+
+After starting the API, send the clean observations reserved in the chronological test split through the deployed `/predict` endpoint:
+
+```bash
+python -m scripts.validate_heldout_api \
+  --api-url http://127.0.0.1:8000 \
+  --output artifacts/heldout_api_metrics.json
+```
+
+The script validates and engineers the dataset, obtains the untouched test split, sends one API request per complete held-out example, and calculates MAE and RMSE against `TargetOccupancy`. It records the total available examples, request success/failure counts, and metrics in `artifacts/heldout_api_metrics.json`.
+
+Use `--limit N` for a smaller smoke test. A full validation should not use `--limit`.
+
 ## Project Team
 
 - Emmalucia E.
@@ -585,4 +599,3 @@ The tests use a mock model to verify request validation, prediction outputs, fea
 - Monica P.
 
 University of Chicago — ADSP 32021 Machine Learning Operations, Fall 2026.
-
