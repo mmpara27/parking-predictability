@@ -1,0 +1,143 @@
+{
+  "evidently_version": "0.7.23",
+  "reference_examples": 3727,
+  "drifted_examples": 3727,
+  "report_data": {
+    "metrics": [
+      {
+        "id": "15e89f895b482f9b84ba7274ed18a106",
+        "metric_name": "DriftedColumnsCount(drift_share=0.5)",
+        "config": {
+          "type": "evidently:metric_v2:DriftedColumnsCount",
+          "drift_share": 0.5
+        },
+        "value": {
+          "count": 8.0,
+          "share": 0.7272727272727273
+        }
+      },
+      {
+        "id": "f06857d90d21decce6d041eb8fec8cb9",
+        "metric_name": "ValueDrift(column=Capacity,method=Wasserstein distance (normed),threshold=0.1)",
+        "config": {
+          "type": "evidently:metric_v2:ValueDrift",
+          "column": "Capacity",
+          "method": "Wasserstein distance (normed)",
+          "threshold": 0.1
+        },
+        "value": 0.0
+      },
+      {
+        "id": "d1b6673232dcc5ac18e6fd87c4f703a0",
+        "metric_name": "ValueDrift(column=Occupancy,method=Wasserstein distance (normed),threshold=0.1)",
+        "config": {
+          "type": "evidently:metric_v2:ValueDrift",
+          "column": "Occupancy",
+          "method": "Wasserstein distance (normed)",
+          "threshold": 0.1
+        },
+        "value": 0.3250310013455622
+      },
+      {
+        "id": "d78fef4ca60ff61e460a3519f627c489",
+        "metric_name": "ValueDrift(column=occupancy_lag_1,method=Wasserstein distance (normed),threshold=0.1)",
+        "config": {
+          "type": "evidently:metric_v2:ValueDrift",
+          "column": "occupancy_lag_1",
+          "method": "Wasserstein distance (normed)",
+          "threshold": 0.1
+        },
+        "value": 0.31796055428091247
+      },
+      {
+        "id": "73384a3363dd1f90a8274877391a83a8",
+        "metric_name": "ValueDrift(column=occupancy_lag_2,method=Wasserstein distance (normed),threshold=0.1)",
+        "config": {
+          "type": "evidently:metric_v2:ValueDrift",
+          "column": "occupancy_lag_2",
+          "method": "Wasserstein distance (normed)",
+          "threshold": 0.1
+        },
+        "value": 0.3110393994432607
+      },
+      {
+        "id": "2d22b0b569e19eb7277f636abe36de36",
+        "metric_name": "ValueDrift(column=occupancy_change_1,method=Wasserstein distance (normed),threshold=0.1)",
+        "config": {
+          "type": "evidently:metric_v2:ValueDrift",
+          "column": "occupancy_change_1",
+          "method": "Wasserstein distance (normed)",
+          "threshold": 0.1
+        },
+        "value": 0.14224742734193152
+      },
+      {
+        "id": "cf889a3a9f8bf714f0d175207696325d",
+        "metric_name": "ValueDrift(column=occupancy_rolling_mean_3,method=Wasserstein distance (normed),threshold=0.1)",
+        "config": {
+          "type": "evidently:metric_v2:ValueDrift",
+          "column": "occupancy_rolling_mean_3",
+          "method": "Wasserstein distance (normed)",
+          "threshold": 0.1
+        },
+        "value": 0.31936567814955563
+      },
+      {
+        "id": "8e91ef16f437d2fc34d1c7982e700e3e",
+        "metric_name": "ValueDrift(column=SystemCodeNumber,method=Jensen-Shannon distance,threshold=0.1)",
+        "config": {
+          "type": "evidently:metric_v2:ValueDrift",
+          "column": "SystemCodeNumber",
+          "method": "Jensen-Shannon distance",
+          "threshold": 0.1
+        },
+        "value": 0.0
+      },
+      {
+        "id": "c64ecf263235641a4c979f593f6f62f3",
+        "metric_name": "ValueDrift(column=hour,method=Jensen-Shannon distance,threshold=0.1)",
+        "config": {
+          "type": "evidently:metric_v2:ValueDrift",
+          "column": "hour",
+          "method": "Jensen-Shannon distance",
+          "threshold": 0.1
+        },
+        "value": 0.7291668911189261
+      },
+      {
+        "id": "791252835952e68c135899e6207ec363",
+        "metric_name": "ValueDrift(column=day_of_week,method=Jensen-Shannon distance,threshold=0.1)",
+        "config": {
+          "type": "evidently:metric_v2:ValueDrift",
+          "column": "day_of_week",
+          "method": "Jensen-Shannon distance",
+          "threshold": 0.1
+        },
+        "value": 0.22468431007208542
+      },
+      {
+        "id": "775d58826c83ad4993f890c6b77b02a9",
+        "metric_name": "ValueDrift(column=is_weekend,method=Jensen-Shannon distance,threshold=0.1)",
+        "config": {
+          "type": "evidently:metric_v2:ValueDrift",
+          "column": "is_weekend",
+          "method": "Jensen-Shannon distance",
+          "threshold": 0.1
+        },
+        "value": 0.006895619121232712
+      },
+      {
+        "id": "bb172f3d97e12dbbb2c77f5e8a622a5f",
+        "metric_name": "ValueDrift(column=month,method=Jensen-Shannon distance,threshold=0.1)",
+        "config": {
+          "type": "evidently:metric_v2:ValueDrift",
+          "column": "month",
+          "method": "Jensen-Shannon distance",
+          "threshold": 0.1
+        },
+        "value": 0.8325546111576977
+      }
+    ],
+    "tests": []
+  }
+}
