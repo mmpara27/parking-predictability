@@ -592,6 +592,26 @@ The script validates and engineers the dataset, obtains the untouched test split
 
 Use `--limit N` for a smaller smoke test. A full validation should not use `--limit`.
 
+### Drift and schema-anomaly monitoring
+
+Install `requirements-api.txt` and start the API with its MLflow model available. Generate controlled drift evidence from the chronological held-out test split:
+
+```bash
+python -m scripts.simulate_drift \
+  --api-url http://127.0.0.1:8000 \
+  --drift-output artifacts/evidently_drift_report.html \
+  --drift-metrics artifacts/drift_metrics.json \
+  --schema-output artifacts/schema_validation_log.json
+```
+
+The script uses clean held-out features as the reference and applies seeded shifts to occupancy and calendar features. It preserves facility capacity and keeps shifted occupancy values within capacity. Six malformed payloads go to `/predict` to exercise HTTP 422 validation.
+
+- `evidently_drift_report.html` shows dataset and per-feature drift.
+- `drift_metrics.json` records the Evidently version, sample counts, and drift metrics.
+- `schema_validation_log.json` records each validation response and the pass count. The command exits with status 1 if any request fails the validation check.
+
+Use the clean held-out API validation above to measure prediction error against the observed targets.
+
 ## Project Team
 
 - Emmalucia E.
