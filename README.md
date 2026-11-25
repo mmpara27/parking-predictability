@@ -578,6 +578,108 @@ python -m pytest tests/test_api.py -v
 
 The tests use a mock model to verify request validation, prediction outputs, feature ordering, and clipping behavior.
 
+### Running the API with Docker
+
+The prediction API can run in a Docker container while connecting to an MLflow tracking server running on the host machine. The container uses Python 3.11 and installs the dependencies from `requirements-api.txt`.
+
+**1. Build the Docker image**
+
+From the repository root:
+
+```bash
+docker build -t parking-predictability-api:local .
+```
+
+**2. Start the MLflow tracking server**
+
+The registered model must be available in the local MLflow Model Registry before inference.
+
+From the repository root, activate the MLflow environment and start the server:
+
+```bash
+source .venv-mlflow/bin/activate
+
+mlflow server \
+  --host 0.0.0.0 \
+  --port 5001 \
+  --backend-store-uri sqlite:///mlflow.db \
+  --default-artifact-root ./mlartifacts \
+  --allowed-hosts "localhost,127.0.0.1,host.docker.internal,host.docker.internal:5001"
+```
+
+The `host.docker.internal` hostname allows the Docker container to reach the MLflow server on the host. The hostname with port `5001` is included in the allowlist to avoid MLflow host-header validation errors.
+
+This configuration is intended for trusted local development. Binding MLflow to `0.0.0.0` may expose it to other devices on the network.
+
+**3. Start the Docker container**
+
+Open another terminal and run the following command from the repository root:
+
+```bash
+docker run --rm \
+  --name parking-api \
+  -p 8000:8000 \
+  -e MLFLOW_TRACKING_URI=http://host.docker.internal:5001 \
+  --mount "type=bind,source=$(pwd)/mlruns,target=$(pwd)/mlruns,readonly" \
+  parking-predictability-api:local
+```
+
+The read-only bind mount makes the existing MLflow model artifacts accessible inside the container.
+
+This setup assumes the registered model's artifact URI references the repository's `mlruns` directory at the same absolute path. If the repository has moved since model registration, verify the stored artifact URI before starting the container.
+
+Model artifacts are not included in the Docker image.
+
+**4. Verify the health endpoint**
+
+In another terminal:
+
+```bash
+curl -i http://127.0.0.1:8000/health
+```
+
+Expected HTTP status: `200 OK`.
+
+**5. Test model inference**
+
+```bash
+curl -i -X POST \
+  http://127.0.0.1:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "SystemCodeNumber": "BHMBCCMKT01",
+    "Capacity": 500,
+    "Occupancy": 250,
+    "hour": 14,
+    "day_of_week": 2,
+    "is_weekend": 0,
+    "month": 11,
+    "occupancy_lag_1": 245,
+    "occupancy_lag_2": 240,
+    "occupancy_change_1": 5,
+    "occupancy_rolling_mean_3": 245
+  }'
+```
+
+A successful request returns HTTP `200 OK` with the predicted occupancy, predicted available spaces, forecast horizon, and registered model version.
+
+**6. Stop the container**
+
+```bash
+docker stop parking-api
+```
+
+The `--rm` flag automatically removes the container after it stops.
+
+**Troubleshooting**
+
+- **HTTP 403 from MLflow:** Verify that `host.docker.internal:5001` is included in the MLflow server's `--allowed-hosts` setting.
+- **`No such artifact` error:** Check the registered model's artifact URI and confirm that the corresponding host directory is mounted inside Docker.
+- **HTTP 500 from `/predict`:** Inspect the container logs using `docker logs --tail 80 parking-api`.
+- **Model loading failure:** Confirm that the registered model exists and its required serialization dependencies are installed.
+
+This Docker configuration has been tested locally with the registered `parking-occupancy-random-forest` model, version 1. It relies on an existing host MLflow server and local model artifacts rather than packaging the model into a standalone image.
+
 ### Clean held-out API validation
 
 After starting the API, send the clean observations reserved in the chronological test split through the deployed `/predict` endpoint:
