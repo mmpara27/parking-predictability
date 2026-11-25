@@ -1,0 +1,57 @@
+{
+  "source_commit": "1fc244c0c494e7dd996d756a3a50d9201361bb4f",
+  "dataset_sha256": "f1e28b9c697769a1a05cd20148241b60b1a73fee4907611163efc6fd9d12770a",
+  "versions": {
+    "mlflow": "3.18.0",
+    "pandas": "2.3.3",
+    "scikit_learn": "1.9.1"
+  },
+  "complete_examples": {
+    "training": 18627,
+    "validation": 3389,
+    "clean_holdout": 3727
+  },
+  "prior_validation_metrics": {
+    "Persistence Baseline": {
+      "MAE": 54.1006196518147,
+      "RMSE": 93.67574171269437
+    },
+    "Linear Regression": {
+      "MAE": 20.01310286194609,
+      "RMSE": 33.674047616759104
+    },
+    "Random Forest": {
+      "MAE": 18.775141363873647,
+      "RMSE": 33.672738797174844
+    }
+  },
+  "retraining_validation_metrics": {
+    "Persistence Baseline": {
+      "MAE": 54.1006196518147,
+      "RMSE": 93.67574171269437
+    },
+    "Linear Regression": {
+      "MAE": 20.013102870090183,
+      "RMSE": 33.67404761602619
+    },
+    "Random Forest": {
+      "MAE": 18.775141363873644,
+      "RMSE": 33.67273879717484
+    }
+  },
+  "clean_holdout_metrics": {
+    "Persistence Baseline": {
+      "MAE": 49.78803327072713,
+      "RMSE": 91.32882707677065
+    },
+    "Random Forest Candidate": {
+      "MAE": 18.47664949335686,
+      "RMSE": 34.26521135837771
+    }
+  },
+  "local_mlflow_run_ids": {
+    "Random Forest": "d5d5206a6ea642cf8e8f802254d7b4cd",
+    "Linear Regression": "657739502f05422f8a6b5ff4104d0a84",
+    "Persistence Baseline": "52f232b75a244fa8b42c6841c3551000"
+  }
+}

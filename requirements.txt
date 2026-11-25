@@ -1,4 +1,6 @@
+evidently>=0.7,<1.0
 joblib>=1.3
 numpy>=1.26
-pandas>=2.1
+# Evidently 0.7 still imports pandas internals removed in pandas 3.
+pandas>=2.1,<3.0
 scikit-learn>=1.4

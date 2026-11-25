@@ -1,0 +1,169 @@
+{
+  "api_url": "http://testserver",
+  "scenarios_requested": 6,
+  "status_counts": {
+    "422": 6
+  },
+  "scenarios_passed": 6,
+  "scenarios": [
+    {
+      "scenario": "missing_hour",
+      "status_code": 422,
+      "expected_status": 422,
+      "passed": true,
+      "response": {
+        "detail": [
+          {
+            "type": "missing",
+            "loc": [
+              "body",
+              "hour"
+            ],
+            "msg": "Field required",
+            "input": {
+              "SystemCodeNumber": "BHMBCCMKT01",
+              "Capacity": 577,
+              "Occupancy": 328.48773663803547,
+              "day_of_week": 5,
+              "is_weekend": 1,
+              "month": 3,
+              "occupancy_lag_1": 325.70900954052644,
+              "occupancy_lag_2": 304.5364592913044,
+              "occupancy_change_1": 2.7787270975090337,
+              "occupancy_rolling_mean_3": 319.5777351566221
+            }
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "wrong_capacity_type",
+      "status_code": 422,
+      "expected_status": 422,
+      "passed": true,
+      "response": {
+        "detail": [
+          {
+            "type": "int_parsing",
+            "loc": [
+              "body",
+              "Capacity"
+            ],
+            "msg": "Input should be a valid integer, unable to parse string as an integer",
+            "input": "not-a-number"
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "negative_occupancy",
+      "status_code": 422,
+      "expected_status": 422,
+      "passed": true,
+      "response": {
+        "detail": [
+          {
+            "type": "greater_than_equal",
+            "loc": [
+              "body",
+              "Occupancy"
+            ],
+            "msg": "Input should be greater than or equal to 0",
+            "input": -1,
+            "ctx": {
+              "ge": 0.0
+            }
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "zero_capacity",
+      "status_code": 422,
+      "expected_status": 422,
+      "passed": true,
+      "response": {
+        "detail": [
+          {
+            "type": "greater_than",
+            "loc": [
+              "body",
+              "Capacity"
+            ],
+            "msg": "Input should be greater than 0",
+            "input": 0,
+            "ctx": {
+              "gt": 0
+            }
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "occupancy_exceeds_capacity",
+      "status_code": 422,
+      "expected_status": 422,
+      "passed": true,
+      "response": {
+        "detail": [
+          {
+            "type": "value_error",
+            "loc": [
+              "body"
+            ],
+            "msg": "Value error, Occupancy cannot exceed facility capacity",
+            "input": {
+              "SystemCodeNumber": "BHMBCCMKT01",
+              "Capacity": 577,
+              "Occupancy": 578,
+              "hour": 18,
+              "day_of_week": 5,
+              "is_weekend": 1,
+              "month": 3,
+              "occupancy_lag_1": 325.70900954052644,
+              "occupancy_lag_2": 304.5364592913044,
+              "occupancy_change_1": 2.7787270975090337,
+              "occupancy_rolling_mean_3": 319.5777351566221
+            },
+            "ctx": {
+              "error": {}
+            }
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "lag_exceeds_capacity",
+      "status_code": 422,
+      "expected_status": 422,
+      "passed": true,
+      "response": {
+        "detail": [
+          {
+            "type": "value_error",
+            "loc": [
+              "body"
+            ],
+            "msg": "Value error, occupancy_lag_1 cannot exceed facility capacity",
+            "input": {
+              "SystemCodeNumber": "BHMBCCMKT01",
+              "Capacity": 577,
+              "Occupancy": 328.48773663803547,
+              "hour": 18,
+              "day_of_week": 5,
+              "is_weekend": 1,
+              "month": 3,
+              "occupancy_lag_1": 578,
+              "occupancy_lag_2": 304.5364592913044,
+              "occupancy_change_1": 2.7787270975090337,
+              "occupancy_rolling_mean_3": 319.5777351566221
+            },
+            "ctx": {
+              "error": {}
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

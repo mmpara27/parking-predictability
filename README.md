@@ -159,7 +159,7 @@ The project combines reusable machine learning functions with orchestration, exp
 | Experiment tracking | MLflow | Record model parameters, metrics, and artifacts | Planned |
 | Model serving | FastAPI | Expose a prediction endpoint | Planned |
 | Containerization | Docker | Package the inference application | Planned |
-| Model monitoring | Evidently AI | Detect data drift and monitor input distributions | Planned |
+| Model monitoring | Evidently AI | Detect data drift and monitor input distributions | Demonstrated |
 
 ## Project Progress
 
@@ -175,7 +175,7 @@ As of November 17, 2026:
 | Airflow pipeline | Implemented and tested |
 | MLflow tracking and registration | Pending |
 | FastAPI and Docker deployment | Pending |
-| Monitoring and drift simulation | Pending |
+| Monitoring and drift simulation | Demonstrated |
 
 ## Running the Project
 
@@ -592,10 +592,60 @@ The script validates and engineers the dataset, obtains the untouched test split
 
 Use `--limit N` for a smaller smoke test. A full validation should not use `--limit`.
 
-## Project Team
+### Drift and schema-anomaly monitoring
 
-- Emmalucia E.
-- Alison C.
-- Monica P.
+Install `requirements-api.txt` and start the API with its MLflow model available. Generate controlled drift evidence from the chronological held-out test split:
 
-University of Chicago — ADSP 32021 Machine Learning Operations, Fall 2026.
+```bash
+python -m scripts.simulate_drift \
+  --api-url http://127.0.0.1:8000 \
+  --drift-output artifacts/evidently_drift_report.html \
+  --drift-metrics artifacts/drift_metrics.json \
+  --schema-output artifacts/schema_validation_log.json
+```
+
+The script uses clean held-out features as the reference and applies seeded shifts to occupancy and calendar features. It preserves facility capacity and keeps shifted occupancy values within capacity. Six malformed payloads go to `/predict` to exercise HTTP 422 validation.
+
+- `evidently_drift_report.html` shows dataset and per-feature drift.
+- `drift_metrics.json` records the Evidently version, sample counts, and drift metrics.
+- `schema_validation_log.json` records each validation response and the pass count. The command exits with status 1 if any request fails the validation check.
+
+Use the clean held-out API validation above to measure prediction error against the observed targets.
+
+### Retraining demonstration
+
+The controlled monitoring run compared 3,727 clean held-out rows with 3,727 shifted rows. All shifted rows passed the request schema. Evidently flagged 8 of 11 features (72.7%), above its 50% dataset drift threshold. It flagged occupancy, both occupancy lags, occupancy change, the rolling occupancy mean, hour, day of week, and month. Capacity, facility ID, and the weekend indicator stayed below their drift thresholds.
+
+| Signal | Evidence | Review decision |
+| --- | --- | --- |
+| Feature drift | [Evidently report](artifacts/evidently_drift_report.html) and [drift metrics](artifacts/drift_metrics.json) | Investigate the shift and collect representative labeled observations. |
+| Prediction degradation | Compare MAE and RMSE against observed occupancy on the same labeled holdout for both the deployed model and candidate. | Use the error comparison to decide whether to promote a candidate. The synthetic shift supplies no corresponding future occupancy labels. |
+| Schema errors | [Validation log](artifacts/schema_validation_log.json). FastAPI returned HTTP 422 for all six malformed requests in an in-process test with model loading stubbed. | Investigate request construction and input data quality. |
+
+![Evidently report showing dataset drift and eight of eleven features flagged](docs/monitoring/evidently-overview.png)
+
+[Schema validation screenshot for the presentation](docs/monitoring/schema-validation.png)
+
+#### Reproduce the training run
+
+From the repository root, with `requirements-api.txt` installed and the MLflow server running:
+
+```bash
+MLFLOW_TRACKING_URI=http://127.0.0.1:5001 python -m src.train_models \
+  --data data/dataset.csv \
+  --artifacts artifacts/pipeline_runs/issue-10
+```
+
+#### Demonstration results
+
+The demonstration logged all three runs to an isolated SQLite-backed MLflow store. It used 18,627 complete training rows and 3,389 complete validation rows from the original chronological split and reproduced the prior validation scores to two decimal places. Errors are measured in parking spaces. [Run IDs, dependency versions, and full-precision metrics](docs/monitoring/retraining-results.json)
+
+| Model | Validation MAE | Validation RMSE |
+| --- | ---: | ---: |
+| Persistence baseline | 54.10 | 93.68 |
+| Linear regression | 20.01 | 33.67 |
+| Random forest | 18.78 | 33.67 |
+
+On 3,727 clean held-out rows, the saved random forest candidate scored **18.48 MAE** and **34.27 RMSE** after clipping predictions to facility capacity. The persistence baseline scored **49.79 MAE** and **91.33 RMSE** on the same rows.
+
+The random forest is the candidate for review. Before promoting it, compare its MAE and RMSE with the deployed model on the same labeled observations from the affected period, then record the teammate review and decision.
