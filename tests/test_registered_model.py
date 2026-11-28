@@ -1,3 +1,6 @@
+import math
+import os
+
 import mlflow
 import mlflow.sklearn
 import pandas as pd
@@ -10,33 +13,43 @@ from src.feature_engineering import (
 )
 from src.feature_schema import FEATURE_COLUMNS
 
-# Connect to the local MLflow server
-mlflow.set_tracking_uri("http://127.0.0.1:5000")
 
-# Load the registered Random Forest model
-model = mlflow.sklearn.load_model(
-    "models:/parking-occupancy-random-forest/1"
-)
+def test_registered_model_prediction():
+    mlflow.set_tracking_uri(
+        os.getenv("MLFLOW_TRACKING_URI", "http://127.0.0.1:5001")
+    )
 
-# Prepare a real example from the held-out test split
-raw_df = pd.read_csv("data/dataset.csv")
-validated_df = validate_parking_data(raw_df)
-historical_df = create_historical_features(validated_df)
-forecast_df = create_forecast_targets(historical_df)
+    model = mlflow.sklearn.load_model(
+        "models:/parking-occupancy-random-forest/1"
+    )
 
-_, _, test_df = chronological_split(forecast_df)
+    raw_df = pd.read_csv("data/dataset.csv")
+    validated_df = validate_parking_data(raw_df)
+    historical_df = create_historical_features(validated_df)
+    forecast_df = create_forecast_targets(historical_df)
 
-valid_test_df = test_df.dropna(subset=FEATURE_COLUMNS)
-sample = valid_test_df[FEATURE_COLUMNS].head(1).copy()
+    _, _, test_df = chronological_split(forecast_df)
 
-# Generate a prediction
-raw_prediction = float(model.predict(sample)[0])
+    valid_test_df = test_df.dropna(subset=FEATURE_COLUMNS)
+    assert not valid_test_df.empty, "No valid held-out samples"
 
-capacity = float(sample["Capacity"].iloc[0])
-predicted_occupancy = max(0, min(raw_prediction, capacity))
-predicted_available = capacity - predicted_occupancy
+    sample = valid_test_df[FEATURE_COLUMNS].head(1).copy()
 
-print("PASS: Registered model prediction successful")
-print("Input features:", len(sample.columns))
-print("Predicted occupancy:", round(predicted_occupancy, 2))
-print("Predicted available spaces:", round(predicted_available, 2))
+    raw_prediction = float(model.predict(sample)[0])
+    capacity = float(sample["Capacity"].iloc[0])
+
+    assert capacity > 0
+    assert math.isfinite(raw_prediction), "Prediction must be finite"
+
+    predicted_occupancy = max(0, min(raw_prediction, capacity))
+    predicted_available = capacity - predicted_occupancy
+
+    assert 0 <= predicted_occupancy <= capacity
+    assert 0 <= predicted_available <= capacity
+
+    print(
+        f"\nPASS: Registered model prediction successful"
+        f"\nInput features: {len(sample.columns)}"
+        f"\nPredicted occupancy: {predicted_occupancy:.2f}"
+        f"\nPredicted available spaces: {predicted_available:.2f}"
+    )
