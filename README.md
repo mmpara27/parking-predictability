@@ -317,7 +317,7 @@ The automated training pipeline was developed and verified using Python 3.11.18 
 | Dependency | Tested version |
 |---|---|
 | Apache Airflow | 2.11.0 |
-| pandas | 3.1.1 |
+| pandas | 2.3.3 |
 | NumPy | 2.4.6 |
 | scikit-learn | 1.9.1 |
 | joblib | 1.6.0 |
@@ -448,46 +448,69 @@ Random Forest was the lowest-RMSE model on validation data. The held-out test sp
 
 ## Running Tests
 
-Install the project and Airflow dependencies using the environment setup instructions above.
+Install the project, API, and Airflow dependencies using the environment setup instructions above.
 
-From the repository root, activate the virtual environment and load the Airflow configuration:
+From the repository root, activate the virtual environment and load the project-specific Airflow configuration:
 
 ```bash
 source .venv/bin/activate
 source scripts/airflow_env.sh
 ```
 
-Run the complete automated test suite:
+The Airflow configuration must be loaded in the same terminal used to run the tests. Otherwise, Airflow may use the default database in `~/airflow` rather than the project's configured database.
+
+### Full Regression Suite
+
+Start the local MLflow tracking server and confirm that `parking-occupancy-random-forest` version 1 is registered and accessible.
+
+Run all automated tests:
 
 ```bash
-python -m unittest discover -s tests -v
+MLFLOW_TRACKING_URI=http://127.0.0.1:5001 \
+python -m pytest tests/ -v
 ```
 
-Run pipeline-specific tests:
+**Verified result:** 37 passed, 0 failed (November 27, 2026).
+
+The registered-model integration test requires a running MLflow server and access to the registered model's artifacts. API unit tests use mocked inference and do not require the deployed API container.
+
+### Individual Test Suites
+
+Run pipeline task tests:
 
 ```bash
-python -m unittest discover -s tests -p "test_pipeline_tasks.py" -v
+python -m pytest tests/test_pipeline_tasks.py -v
 ```
 
-Run DAG configuration and dependency tests:
+Run Airflow DAG tests:
 
 ```bash
-python -m unittest discover -s tests -p "test_training_dag.py" -v
+python -m pytest tests/test_training_dag.py -v
+```
+
+Run the registered-model integration test:
+
+```bash
+MLFLOW_TRACKING_URI=http://127.0.0.1:5001 \
+python -m pytest tests/test_registered_model.py -v
 ```
 
 ### Test Coverage
 
 | Test category | Tests passed |
 |---|---:|
-| Existing project tests | 4 |
-| Pipeline task tests | 11 |
-| Airflow DAG tests | 6 |
-| Total | 21 |
+| Prediction API | 7 |
+| Drift monitoring | 4 |
+| Held-out API validation | 4 |
+| Pipeline tasks | 11 |
+| Registered-model inference | 1 |
+| Model training | 4 |
+| Airflow DAG | 6 |
+| **Total** | **37** |
 
-The tests cover input ingestion, invalid input handling, chronological splitting, model training, artifact verification, DAG loading, task dependencies, and execution configuration.
+The tests cover data ingestion, validation, feature processing, chronological splitting, model training, artifact verification, registered-model inference, API input validation, held-out evaluation calculations, drift monitoring, and Airflow DAG configuration.
 
-All 21 automated tests passed. End-to-end Airflow execution was also verified separately through successful runs and intentional failure scenarios.
-
+End-to-end Airflow execution, deployed API evaluation, and controlled drift simulations were also verified separately.
 
 ## Prediction API
 
@@ -694,6 +717,17 @@ The script validates and engineers the dataset, obtains the untouched test split
 
 Use `--limit N` for a smaller smoke test. A full validation should not use `--limit`.
 
+**Verified full held-out evaluation (November 27, 2026):**
+
+- Held-out observations: 3,727
+- Successful API requests: 3,727 (100%)
+- Failed requests: 0
+- MAE: 18.4767
+- RMSE: 34.2652
+- Results saved to `artifacts/heldout_api_validation.json`.
+
+The evaluation used the complete chronological held-out test split without a request limit.
+
 ### Drift and schema-anomaly monitoring
 
 Install `requirements-api.txt` and start the API with its MLflow model available. Generate controlled drift evidence from the chronological held-out test split:
@@ -713,6 +747,22 @@ The script uses clean held-out features as the reference and applies seeded shif
 - `schema_validation_log.json` records each validation response and the pass count. The command exits with status 1 if any request fails the validation check.
 
 Use the clean held-out API validation above to measure prediction error against the observed targets.
+
+**Verified drift and schema validation (November 27, 2026):**
+
+- Reference observations: 3,727
+- Drifted observations: 3,727
+- Features with detected drift: 8 of 11 (72.7%)
+- Dataset drift threshold: 50%
+- Invalid API payloads correctly rejected: 6 of 6 (HTTP 422)
+
+Generated validation evidence:
+
+- `artifacts/drift_simulation_metrics.json`
+- `artifacts/schema_validation.json`
+- `artifacts/drift_simulation.json` (full generated drift report; retained locally)
+
+The monitoring run completed successfully with no schema-validation failures.
 
 ### Retraining demonstration
 

@@ -1,0 +1,12 @@
+{
+  "dataset": "data/dataset.csv",
+  "api_url": "http://127.0.0.1:8000",
+  "heldout_examples_available": 3727,
+  "examples_requested": 3727,
+  "successful_requests": 3727,
+  "failed_requests": 0,
+  "metrics": {
+    "MAE": 18.47669707539576,
+    "RMSE": 34.26519564670938
+  }
+}
