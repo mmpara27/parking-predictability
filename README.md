@@ -9,7 +9,7 @@ An end-to-end Machine Learning Operations (MLOps) project to predict parking occ
 
 ## Project Overview
 
-This project aims to build an automated machine learning pipeline that forecasts parking occupancy approximately 30 minutes ahead.
+This project implements an automated machine learning pipeline that forecasts parking occupancy approximately 30 minutes ahead.
 
 The system will estimate available parking spaces using:
 
@@ -19,7 +19,9 @@ Available spaces = Capacity − Predicted occupancy
 
 Predicted occupancy will be constrained to the valid range between zero and facility capacity.
 
-The planned MLOps workflow includes data validation, feature engineering, model training, experiment tracking, deployment, and monitoring.
+The implemented MLOps workflow integrates data validation, feature engineering, model training, experiment tracking, model registration, containerized inference, and monitoring. Apache Airflow orchestrates training, MLflow manages model experiments and versions, and a Dockerized FastAPI service provides predictions. Evidently AI supports drift analysis and monitoring demonstrations.
+
+The project uses historical parking observations for approximately 30-minute-ahead forecasts. It is a reproducible prototype rather than a live parking availability service.
 
 For the original project scope and proposed architecture, see [Project Proposal](project_proposal.md).
 
@@ -57,29 +59,43 @@ parking-predictability/
 │   └── parking_training_dag.py
 ├── data/
 │   └── dataset.csv
+├── docs/
+│   ├── model_loading_contract.md
+│   └── monitoring/                # Monitoring evidence
 ├── notebooks/
 │   ├── 01_data_audit.ipynb
 │   ├── 02_feature_engineering.ipynb
 │   └── 03_modeling.ipynb
 ├── scripts/
-│   └── airflow_env.sh
+│   ├── airflow_env.sh
+│   ├── simulate_drift.py
+│   └── validate_heldout_api.py
 ├── src/
+│   ├── api.py
 │   ├── data_validation.py
 │   ├── feature_engineering.py
 │   ├── feature_schema.py
 │   ├── pipeline_tasks.py
 │   └── train_models.py
 ├── tests/
+│   ├── test_api.py
+│   ├── test_drift_monitoring.py
+│   ├── test_heldout_api_validation.py
 │   ├── test_pipeline_tasks.py
+│   ├── test_registered_model.py
 │   ├── test_train_models.py
 │   └── test_training_dag.py
+├── .dockerignore
+├── .gitignore
+├── Dockerfile
 ├── requirements.txt
 ├── requirements-airflow.txt
+├── requirements-api.txt
 ├── project_proposal.md
 └── README.md
 ```
 
-Generated model artifacts, pipeline run directories, virtual environments, and local Airflow databases are excluded from version control. Additional deployment, experiment tracking, and monitoring components will be added as development progresses.
+Generated model artifacts, pipeline run directories, virtual environments, and local Airflow databases are excluded from version control. The repository also includes API deployment, experiment tracking, monitoring, and integration testing components.
 
 ## Data Validation
 
@@ -150,36 +166,52 @@ The earlier exploratory notebook used a different filtering and splitting workfl
 
 ## MLOps Pipeline
 
-The project combines reusable machine learning functions with orchestration, experiment tracking, deployment, and monitoring components.
+The project combines reusable machine learning components with orchestration, experiment tracking, model serving, and monitoring.
 
-| Component | Technology | Purpose | Status |
-|---|---|---|---|
-| Pipeline orchestration | Apache Airflow | Automate data preparation and model training | Implemented |
-| Model training | scikit-learn | Compare baseline and regression models | Implemented |
-| Experiment tracking | MLflow | Record model parameters, metrics, and artifacts | Planned |
-| Model serving | FastAPI | Expose a prediction endpoint | Planned |
-| Containerization | Docker | Package the inference application | Planned |
-| Model monitoring | Evidently AI | Detect data drift and monitor input distributions | Demonstrated |
+| Component | Technology | Implementation status |
+|---|---|---|
+| Data validation and feature engineering | Python, pandas | Implemented and tested |
+| Model training and evaluation | scikit-learn | Implemented and tested |
+| Pipeline orchestration | Apache Airflow | Implemented and tested |
+| Experiment tracking and model registry | MLflow | Implemented and tested locally |
+| Prediction API | FastAPI | Implemented and tested |
+| Containerized inference | Docker | Implemented and tested locally |
+| Model monitoring | Evidently AI | Drift and schema-anomaly simulations completed |
+| End-to-end integration | pytest, Python, HTTP API | Verified with 37 automated tests and full held-out API evaluation |
 
-## Project Progress
+The system was validated using 3,727 held-out API requests, with no failed requests. Controlled monitoring tests detected drift in 8 of 11 input features and correctly rejected all six malformed API requests.
 
-As of November 17, 2026:
+The prototype supports a reviewed retraining workflow; automatic model promotion and production deployment are outside the implemented scope.
 
-| Component | Status |
-|---|---|
-| Project proposal and repository setup | Completed |
-| Data audit and validation | Completed |
-| Feature engineering and chronological splits | Implemented and tested |
-| Reusable feature schema | Implemented and tested |
-| Baseline and regression models | Implemented and tested |
-| Airflow pipeline | Implemented and tested |
-| MLflow tracking and registration | Pending |
-| FastAPI and Docker deployment | Pending |
-| Monitoring and drift simulation | Demonstrated |
+## End-to-end Architecture
+
+```mermaid
+flowchart TD
+    A["UCI Parking Birmingham Dataset"]
+    B["Apache Airflow Pipeline"]
+    C["Data Validation and Feature Engineering"]
+    D["scikit-learn Model Training and Evaluation"]
+    E["MLflow Tracking and Model Registry"]
+    F["Dockerized FastAPI Prediction Service"]
+    G["Held-out API Evaluation"]
+    H["Evidently Drift and Schema Monitoring"]
+    I["Human Review and Retraining Decision"]
+
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+    F --> H
+    G --> I
+    H --> I
+    I -. "Review and retrain when justified" .-> B
+```
 
 ## Running the Project
 
-The project currently uses Python and pandas for data validation and feature engineering.
+The project uses Python 3.11 for data processing, model training, orchestration, and inference. The following notebooks document the exploratory analysis and modeling workflow.
 
 To explore the completed work, open the following notebooks in VS Code or Jupyter:
 
@@ -308,7 +340,7 @@ A native macOS process-forking issue involving `setproctitle` caused worker cras
 
 This affected standalone Airflow startup but did not prevent successful CLI-based DAG execution or automated testing.
 
-For local development, use `airflow dags test parking_training`. Containerized Airflow execution can be evaluated during the Docker integration phase.
+For local development, use `airflow dags test parking_training`. The FastAPI inference service has been containerized and tested separately; the Airflow scheduler and webserver have not been validated in Docker.
 
 ### Tested Environment
 
@@ -414,14 +446,6 @@ airflow dags test parking_training \
 ```
 
 Both runs are expected to fail. Invalid input prevents downstream processing and model training. A subsequent execution using valid data completed successfully, demonstrating pipeline recovery.
-
-### Local Development Limitations
-
-CLI-based DAG execution and automated tests were verified on Apple Silicon using macOS and Python 3.11.
-
-A native macOS process-forking issue involving `setproctitle` caused worker crashes when starting the standalone Airflow services. This affects the local scheduler and webserver environment rather than the verified CLI training workflow.
-
-For local development, use `airflow dags test parking_training`. Containerized Airflow execution can be evaluated during the Docker integration phase.
 
 ## Project Documentation
 
@@ -776,7 +800,7 @@ The controlled monitoring run compared 3,727 clean held-out rows with 3,727 shif
 
 ![Evidently report showing dataset drift and eight of eleven features flagged](docs/monitoring/evidently-overview.png)
 
-[Schema validation screenshot for the presentation](docs/monitoring/schema-validation.png)
+[Schema validation evidence](docs/monitoring/schema-validation.png)
 
 #### Reproduce the training run
 
@@ -801,3 +825,28 @@ The demonstration logged all three runs to an isolated SQLite-backed MLflow stor
 On 3,727 clean held-out rows, the saved random forest candidate scored **18.48 MAE** and **34.27 RMSE** after clipping predictions to facility capacity. The persistence baseline scored **49.79 MAE** and **91.33 RMSE** on the same rows.
 
 The random forest is the candidate for review. Before promoting it, compare its MAE and RMSE with the deployed model on the same labeled observations from the affected period, then record the teammate review and decision.
+
+## Limitations and Future Improvements
+
+This project demonstrates a reproducible MLOps workflow using historical parking occupancy data. Several limitations remain:
+
+- **Historical data:** The model uses the UCI Parking Birmingham dataset rather than continuously updated parking sensor data. Performance on current parking conditions has not been established.
+- **Forecast horizon:** Predictions target the next recorded observation approximately 30 minutes ahead. Irregular observation intervals limit coverage.
+- **Feature availability:** Inference requires current and historical occupancy features. The API does not independently retrieve live sensor readings or construct historical features.
+- **Local deployment:** Airflow, MLflow, and Docker were validated in a local development environment. Production hosting, access controls, scaling, and operational reliability have not been evaluated.
+- **Monitoring:** Drift detection and schema validation were demonstrated using controlled scenarios. Continuous production monitoring and automated alerting are not implemented.
+- **Retraining:** The project demonstrates retraining and model evaluation, but does not automatically promote or deploy replacement models.
+
+Future improvements could include live data ingestion, automated feature generation, scheduled monitoring, model performance tracking with newly observed labels, and a reviewed model deployment process.
+
+## Team Contributions
+
+This project was developed collaboratively by three team members. The contributions below summarize the primary workstreams documented in the project's GitHub issues and pull requests.
+
+| Team member | Primary contributions |
+|---|---|
+| **Alison C.** | Repository organization and integration coordination; Apache Airflow training pipeline and testing; FastAPI validation and inference improvements; Docker deployment; end-to-end reproducibility testing and documentation. |
+| **Emmalucia E.** | Dataset auditing and validation; chronological data splitting; leakage-safe feature engineering and shared feature schema; MLflow experiment tracking and model registration. |
+| **Monica P.** | Baseline and regression model development; model evaluation; clean held-out API validation; Evidently drift and schema-anomaly monitoring; retraining demonstration and monitoring evidence. |
+
+All three team members contributed to project planning, integration, review, and final documentation.
